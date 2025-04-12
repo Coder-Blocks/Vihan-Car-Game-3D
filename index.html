@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Make viewport responsive and prevent scaling -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Vihan's 3D Racer - Customize!</title>
+    <style>
+        /* --- General --- */
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #a0d7e6; /* Light sky blue background */
+            font-family: sans-serif; /* Added for UI text */
+            /* Prevent default touch behaviors */
+            overscroll-behavior: none;
+            touch-action: none; /* For pointer events */
+        }
+        canvas {
+            display: block; /* Remove annoying space below canvas */
+        }
+
+        /* --- Loading & Start --- */
+        #loading-screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column; /* Center content vertically */
+            font-size: 1.5em;
+            text-align: center;
+            z-index: 100;
+            opacity: 1;
+            transition: opacity 0.5s ease-out;
+        }
+        #loading-screen.hidden {
+             opacity: 0;
+             pointer-events: none; /* Disable interaction after fading */
+        }
+        #start-screen { /* Container for start elements */
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent overlay */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 90; /* Below loading, above game */
+            display: none; /* Hidden until loaded */
+            color: white;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #start-button {
+             padding: 15px 30px;
+             font-size: 1.8em;
+             color: white;
+             background-color: #4CAF50; /* Green */
+             border: none;
+             border-radius: 10px;
+             cursor: pointer;
+             margin-top: 20px;
+        }
+        #garage-placeholder {
+             margin-top: 15px;
+             font-size: 1em;
+             color: #aaa;
+        }
+
+        /* --- Color Selector --- */
+        #color-selector {
+             margin-top: 20px;
+        }
+        #color-selector p {
+            margin-bottom: 10px;
+        }
+        .color-button {
+            width: 40px; height: 40px;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 5px;
+            cursor: pointer;
+            transition: transform 0.1s ease-out;
+            vertical-align: middle; /* Align buttons nicely */
+        }
+        .color-button:hover, .color-button.selected {
+            transform: scale(1.1);
+            border-width: 3px;
+        }
+
+        /* --- In-Game UI --- */
+        #ui-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white; /* White text */
+            text-shadow: 1px 1px 3px black; /* Black shadow for readability */
+            z-index: 50;
+            font-size: 1.3em; /* Slightly smaller font */
+            background-color: rgba(0,0,0,0.2);
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: none; /* Hidden initially */
+        }
+        #score { margin-bottom: 5px; }
+        #level { margin-bottom: 5px; }
+
+        #tips-area { /* For rotating tips */
+            position: absolute;
+            bottom: 110px; /* Position above controls */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 400px;
+            text-align: center;
+            font-size: 1em;
+            color: white;
+            text-shadow: 1px 1px 2px black;
+            background-color: rgba(0,0,0,0.3);
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 55;
+            opacity: 0; /* Start faded out */
+            transition: opacity 0.5s ease-in;
+            display: none; /* Hidden initially */
+            pointer-events: none; /* Don't block controls */
+        }
+
+        #vihan-message { /* For Vihan's messages */
+            position: absolute;
+            top: 35%; /* Position vertically */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 25px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #ffcc00; /* Yellowish */
+            font-size: 1.8em;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 10px;
+            z-index: 101; /* Above most things */
+            display: none; /* Hidden initially */
+            opacity: 0;
+            transition: opacity 0.5s ease-out;
+            pointer-events: none;
+        }
+
+
+        /* --- Game Over Screen --- */
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff4444; /* Bright red */
+            font-size: 3.5em; /* Large text */
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 2px 2px 5px black; /* Stronger shadow */
+            display: none; /* Hidden initially */
+            z-index: 101; /* Above everything else */
+            pointer-events: none; /* Don't block clicks */
+        }
+        #game-over-message { /* Vihan's crash message */
+             font-size: 0.5em; /* Smaller than GAME OVER */
+             color: #ffddaa; /* Lighter orange/yellow */
+             margin-top: 10px;
+        }
+
+
+        /* --- Mobile Control Buttons --- */
+        .control-button {
+            position: absolute;
+            bottom: 20px; /* Position from bottom */
+            width: 80px; /* Button width */
+            height: 80px; /* Button height */
+            background-color: rgba(255, 255, 255, 0.3); /* Semi-transparent white */
+            border: 2px solid rgba(0, 0, 0, 0.5); /* Darker border */
+            border-radius: 50%; /* Circular buttons */
+            z-index: 60; /* Above canvas, below game over */
+            display: flex; /* For centering arrow inside */
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5em; /* Arrow size */
+            color: rgba(0, 0, 0, 0.7); /* Arrow color */
+            cursor: pointer; /* Indicate clickable */
+            /* Prevent text selection/highlighting */
+            user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            -moz-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+             display: none; /* Initially hidden */
+        }
+        /* Style for when button is pressed */
+        .control-button:active {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        #left-button { left: 20px; }
+        #right-button { right: 20px; }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">Loading Assets...</div>
+
+    <!-- Start Screen (Shown After Loading) -->
+    <div id="start-screen">
+        <h1>Vihan's 3D Racer</h1>
+        <div id="color-selector">
+            <p>Choose Your Car Color:</p>
+            <!-- Color buttons will be added here by JS -->
+        </div>
+        <button id="start-button">Start Race!</button>
+        <div id="garage-placeholder">Garage & Upgrades (Coming Soon!)</div>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="container"></div>
+
+    <!-- In-Game UI Elements -->
+    <div id="ui-container">
+        <div id="score">Score: 0</div>
+        <div id="level">Level: 1</div>
+    </div>
+    <div id="tips-area"></div> <!-- Rotating Tips -->
+    <div id="vihan-message"></div> <!-- Level Up / Win Messages -->
+
+    <!-- Game Over Screen -->
+    <div id="game-over">
+        GAME OVER!
+        <div id="game-over-message"></div> <!-- Vihan's Crash Message -->
+    </div>
+
+
+    <!-- Mobile Control Buttons -->
+    <div id="left-button" class="control-button">◀</div>
+    <div id="right-button" class="control-button">▶</div>
+
+
+    <!-- Import Maps for Three.js Modules -->
+     <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <!-- Main Game Logic -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+        // --- Constants ---
+        const roadWidth = 10;
+        const roadLength = 200; // Visual length, objects wrap around
+        const buildingSpacing = 15;
+        const lightSpacing = 30;
+        const kerbHeight = 0.2;
+        const kerbWidth = 0.3;
+        const numPoints = 50;
+        const pointValue = 10;
+        const pointRadius = 0.3;
+        const carMoveSpeed = 0.15;
+        const baseDriveSpeed = 0.4;
+        const speedIncrement = 0.05;
+        const levelScoreThreshold = 200;
+        const scoreThresholdIncrement = 250; // How much more score needed for subsequent levels
+        const enemiesPerLevel = 1; // Add 1 enemy per level
+        const maxTotalEnemies = 5; // Limit total enemies for performance
+        const baseEnemySpeed = 0.35;
+        const enemySpeedVariance = 0.1; // Enemies have slightly different speeds
+        const tipsIntervalDuration = 5000; // 5 seconds per tip
+        const vihanMessageDuration = 3000; // 3 seconds display time
+
+         // --- Vihan's Messages & Tips ---
+        const crashMessages = [
+            "Oops! Vihan says: Even Ferraris need brakes!",
+            "Woah there! Vihan thinks you confused the pedal with the eject button.",
+            "Crash! Vihan asks: Did the other car forget to signal?",
+            "Boom! Vihan's diagnosis: Sudden unplanned disassembly.",
+            "Ouch! Vihan advises: Maybe stick to the virtual lanes next time?",
+            "Kerpow! Vihan heard that one! Try again!",
+        ];
+        const positiveMessages = [ // For level up
+            "Nice! Vihan sees potential!",
+            "Level Up! Vihan is impressed!",
+            "Awesome driving! Vihan gives you a virtual high-five!",
+            "You're getting faster! Vihan approves!",
+            "Sweet moves! Vihan says: Keep it up!",
+        ];
+        const tips = [
+            "Tip: Collect yellow orbs for points!",
+            "Tip: Avoid the blue cars!",
+            "Tip: Use Left/Right arrows or tap screen sides to steer.",
+            "Tip: Score more points to level up and go faster!",
+            "Tip: The red/white kerbs mark the road edge.",
+            "Tip: Vihan designed this road himself!",
+        ];
+        const carColors = [ // Hex codes for color buttons
+            { name: 'Red', hex: 0xff0000 },
+            { name: 'White', hex: 0xffffff },
+            { name: 'Black', hex: 0x111111 },
+            { name: 'Yellow', hex: 0xffdd00 },
+            { name: 'Green', hex: 0x00cc44 },
+            { name: 'Pink', hex: 0xff69b4 },
+            { name: 'Blue', hex: 0x0077ff },
+        ];
+
+
+        // --- State Variables ---
+        let scene, camera, renderer, carModel, carPlaceholder;
+        let ambientLight, directionalLight;
+        let roadLines = [], kerbs = [], buildings = [], streetLights = [], trafficLights = [], points = [];
+        let enemyCars = [], enemyCarTemplate;
+        let moveLeft = false, moveRight = false;
+        let carBaseY = 0, enemyBaseY = 0;
+        let score = 0, currentLevel = 1, currentLevelScoreThreshold = levelScoreThreshold;
+        let isGameOver = false, gameStarted = false;
+        let driveSpeed = baseDriveSpeed;
+        let maxActiveEnemies = 1;
+        let audioCtx = null, audioInitialized = false;
+        let tipsIntervalId = null, currentTipIndex = 0;
+        let selectedColorHex = carColors[0].hex; // Default to first color
+        let vihanMessageTimeoutId = null;
+        let animationFrameId = null; // To cancel animation loop
+
+
+        // --- Bounding Boxes ---
+        let playerBox = new THREE.Box3();
+        let enemyBox = new THREE.Box3(); // Reusable box for checking enemies
+        let pointBox = new THREE.Box3();
+
+        // --- UI Refs ---
+        const loadingScreen = document.getElementById('loading-screen');
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-button');
+        const colorSelectorDiv = document.getElementById('color-selector');
+        const gameContainer = document.getElementById('container'); // Container for canvas
+        const uiContainer = document.getElementById('ui-container');
+        const scoreElement = document.getElementById('score');
+        const levelElement = document.getElementById('level');
+        const tipsArea = document.getElementById('tips-area');
+        const vihanMessageArea = document.getElementById('vihan-message');
+        const gameOverContainer = document.getElementById('game-over');
+        const gameOverMessageElement = document.getElementById('game-over-message');
+        const leftButton = document.getElementById('left-button');
+        const rightButton = document.getElementById('right-button');
+
+        // --- Loading Manager ---
+        const loadingManager = new THREE.LoadingManager();
+        loadingManager.onLoad = () => {
+            console.log("All resources loaded!");
+            loadingScreen.style.opacity = '0'; // Fade out loading screen
+            setTimeout(() => {
+                 loadingScreen.style.display = 'none';
+                 startScreen.style.display = 'flex'; // Show start screen
+            }, 500); // Wait for fade out animation
+        };
+        loadingManager.onError = (url) => {
+             console.error(`Error loading ${url}`);
+             loadingScreen.textContent = `Error loading assets. Check console (F12) & network connection.`;
+             // Optionally disable start button if essential assets failed
+             // startButton.disabled = true; startButton.style.backgroundColor = '#888';
+        };
+        loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+             const progress = Math.round((itemsLoaded / itemsTotal) * 100);
+             loadingScreen.textContent = `Loading ${progress}%...`;
+             console.log(`Loading file: ${url} (${itemsLoaded}/${itemsTotal})`);
+        };
+
+
+        // --- Initialize ---
+        init();
+        // Controls setup and animation loop start after clicking start button
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', startGame);
+        window.addEventListener('resize', onWindowResize, false);
+
+
+        // --- Initialization Functions ---
+        function init() {
+            setupScene();
+            setupLighting();
+            createWorldElements();
+            createPoints();
+            createCarColorSelector(); // Add color buttons to start screen
+            loadModels(); // Load car model
+            // Initial UI setup
+            updateScoreDisplay();
+            updateLevelDisplay();
+        }
+
+        function setupScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xa0d7e6);
+            scene.fog = new THREE.Fog(0xa0d7e6, roadLength * 0.4, roadLength * 0.9);
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio); // Better quality on high DPI screens
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            gameContainer.appendChild(renderer.domElement); // Append canvas to the container div
+        }
+
+        function setupLighting() {
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.7); scene.add(ambientLight);
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1.8); directionalLight.position.set(50, 100, 50); directionalLight.castShadow = true; directionalLight.shadow.mapSize.width = 2048; directionalLight.shadow.mapSize.height = 2048; directionalLight.shadow.camera.near = 0.5; directionalLight.shadow.camera.far = 500; directionalLight.shadow.camera.left = -roadLength / 2; directionalLight.shadow.camera.right = roadLength / 2; directionalLight.shadow.camera.top = roadLength / 2; directionalLight.shadow.camera.bottom = -roadLength / 2; scene.add(directionalLight);
+        }
+
+        function createWorldElements() {
+            // Ground
+            const groundGeo = new THREE.PlaneGeometry(roadLength * 1.5, roadLength); const groundMat = new THREE.MeshStandardMaterial({ color: 0x55aa55, side: THREE.DoubleSide }); const ground = new THREE.Mesh(groundGeo, groundMat); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; scene.add(ground);
+            // Road
+            const roadGeo = new THREE.PlaneGeometry(roadWidth, roadLength); const roadMat = new THREE.MeshStandardMaterial({ color: 0x555555, side: THREE.DoubleSide }); const road = new THREE.Mesh(roadGeo, roadMat); road.rotation.x = -Math.PI / 2; road.position.y = 0.0; road.receiveShadow = true; scene.add(road);
+            // Road Lines
+            const lineLength = 4; const lineGap = 4; const numLines = Math.floor(roadLength / (lineLength + lineGap)); const lineGeo = new THREE.PlaneGeometry(0.3, lineLength); const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            for (let i = 0; i < numLines; i++) { const line = new THREE.Mesh(lineGeo, lineMat); line.rotation.x = -Math.PI / 2; line.position.y = 0.005; line.position.z = (roadLength / 2) - (lineLength / 2) - i * (lineLength + lineGap); line.receiveShadow = true; roadLines.push(line); scene.add(line); }
+            // Kerbs
+            function createKerbTexture() { const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); canvas.width = 64; canvas.height = 16; const stripeWidth = 8; const colors = ['#ff0000', '#ffffff']; for (let i = 0; i < canvas.width / stripeWidth; i++) { ctx.fillStyle = colors[i % 2]; ctx.fillRect(i * stripeWidth, 0, stripeWidth, canvas.height); } return new THREE.CanvasTexture(canvas); }
+            const kerbTexture = createKerbTexture(); kerbTexture.wrapS = THREE.RepeatWrapping; kerbTexture.wrapT = THREE.ClampToEdgeWrapping; kerbTexture.repeat.set(roadLength / 4, 1);
+            const kerbGeo = new THREE.BoxGeometry(kerbWidth, kerbHeight, roadLength); const kerbMat = new THREE.MeshStandardMaterial({ map: kerbTexture });
+            const kerbLeft = new THREE.Mesh(kerbGeo, kerbMat); kerbLeft.position.set(-(roadWidth / 2) - (kerbWidth / 2), kerbHeight / 2, 0); kerbLeft.castShadow = true; kerbLeft.receiveShadow = true; scene.add(kerbLeft); kerbs.push(kerbLeft);
+            const kerbRight = new THREE.Mesh(kerbGeo, kerbMat); kerbRight.position.set((roadWidth / 2) + (kerbWidth / 2), kerbHeight / 2, 0); kerbRight.castShadow = true; kerbRight.receiveShadow = true; scene.add(kerbRight); kerbs.push(kerbRight);
+
+            // Buildings, Street Lights, Traffic Lights (Functions simplified for brevity, same logic as before)
+            function createBuilding() { const height = Math.random() * 30 + 10; const width = Math.random() * 8 + 4; const depth = Math.random() * 8 + 4; const buildingGeo = new THREE.BoxGeometry(width, height, depth); const buildingMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random() * 0.8 + 0.1, Math.random() * 0.8 + 0.1, Math.random() * 0.8 + 0.1), roughness: 0.8, metalness: 0.1 }); const building = new THREE.Mesh(buildingGeo, buildingMat); building.position.y = height / 2; building.castShadow = true; building.receiveShadow = true; return building; }
+            const numBuildings = Math.floor(roadLength / buildingSpacing); for (let i = 0; i < numBuildings; i++) { const buildingLeft = createBuilding(); const buildingRight = createBuilding(); const zPos = (roadLength / 2) - (buildingSpacing / 2) - i * buildingSpacing; const xOffsetLeft = roadWidth / 2 + kerbWidth + 1 + Math.random() * 5 + buildingLeft.geometry.parameters.width / 2; const xOffsetRight = roadWidth / 2 + kerbWidth + 1 + Math.random() * 5 + buildingRight.geometry.parameters.width / 2; buildingLeft.position.set(-xOffsetLeft, buildingLeft.position.y, zPos); buildingRight.position.set(xOffsetRight, buildingRight.position.y, zPos); buildings.push(buildingLeft, buildingRight); scene.add(buildingLeft); scene.add(buildingRight); }
+            function createStreetLight() { const group = new THREE.Group(); const poleHeight = 6; const poleRadius = 0.1; const poleGeo = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight); const poleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.4 }); const pole = new THREE.Mesh(poleGeo, poleMat); pole.castShadow = true; pole.position.y = poleHeight/2; group.add(pole); const armLength = 1; const armGeo = new THREE.BoxGeometry(armLength, poleRadius * 1.5, poleRadius * 1.5); const arm = new THREE.Mesh(armGeo, poleMat); arm.position.set(0, poleHeight - poleRadius * 2, 0); group.add(arm); const lightFixtureGeo = new THREE.SphereGeometry(poleRadius * 2, 16, 8); const lightFixtureMat = new THREE.MeshStandardMaterial({ color: 0xffffaa, emissive: 0xffff00, emissiveIntensity: 0.5 }); const lightFixture = new THREE.Mesh(lightFixtureGeo, lightFixtureMat); lightFixture.position.set(0, poleHeight - poleRadius * 2, 0); group.add(lightFixture); group.userData.armLength = armLength; return group;}
+            const numLights = Math.floor(roadLength / lightSpacing); for (let i = 0; i < numLights; i++) { const lightLeft = createStreetLight(); const lightRight = createStreetLight(); const zPos = (roadLength / 2) - (lightSpacing / 2) - i * lightSpacing; const xPos = roadWidth / 2 + kerbWidth + 0.8; lightLeft.position.set(-xPos, 0, zPos); lightLeft.rotation.y = Math.PI / 2; lightLeft.children[1].position.x = -lightLeft.userData.armLength / 2; lightLeft.children[2].position.x = -lightLeft.userData.armLength; lightRight.position.set(xPos, 0, zPos); lightRight.rotation.y = -Math.PI / 2; lightRight.children[1].position.x = -lightRight.userData.armLength / 2; lightRight.children[2].position.x = -lightRight.userData.armLength; streetLights.push(lightLeft, lightRight); scene.add(lightLeft); scene.add(lightRight); }
+            function createTrafficLight() { const group = new THREE.Group(); const poleHeight = 5; const poleRadius = 0.15; const poleGeo = new THREE.CylinderGeometry(poleRadius, poleRadius, poleHeight); const poleMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.5 }); const pole = new THREE.Mesh(poleGeo, poleMat); pole.position.y = poleHeight / 2; pole.castShadow = true; group.add(pole); const housingWidth = 0.5; const housingHeight = 1.2; const housingDepth = 0.3; const housingGeo = new THREE.BoxGeometry(housingWidth, housingHeight, housingDepth); const housingMat = new THREE.MeshStandardMaterial({ color: 0x333333 }); const housing = new THREE.Mesh(housingGeo, housingMat); housing.position.y = poleHeight - housingHeight / 2; housing.castShadow = true; group.add(housing); const lightRadius = housingWidth * 0.25; const lightGeo = new THREE.SphereGeometry(lightRadius, 16, 8); const redMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xaa0000, emissiveIntensity: 1 }); const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xaaaa00, emissiveIntensity: 1 }); const greenMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00aa00, emissiveIntensity: 1 }); const redLight = new THREE.Mesh(lightGeo, redMat); redLight.position.set(0, housingHeight * 0.3, housingDepth / 2 + 0.01); housing.add(redLight); const yellowLight = new THREE.Mesh(lightGeo, yellowMat); yellowLight.position.set(0, 0, housingDepth / 2 + 0.01); housing.add(yellowLight); const greenLight = new THREE.Mesh(lightGeo, greenMat); greenLight.position.set(0, -housingHeight * 0.3, housingDepth / 2 + 0.01); housing.add(greenLight); return group; }
+            const trafficLightLeft = createTrafficLight(); const trafficLightRight = createTrafficLight(); const trafficLightZ = roadLength * 0.4; const trafficLightX = roadWidth / 2 + kerbWidth + 0.5; trafficLightLeft.position.set(-trafficLightX, 0, trafficLightZ); trafficLightLeft.rotation.y = Math.PI / 2; trafficLightRight.position.set(trafficLightX, 0, trafficLightZ); trafficLightRight.rotation.y = -Math.PI / 2; trafficLights.push(trafficLightLeft, trafficLightRight); scene.add(trafficLightLeft); scene.add(trafficLightRight);
+        }
+
+        function createPoints() {
+            const pointGeometry = new THREE.SphereGeometry(pointRadius, 8, 8);
+            const pointMaterial = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xaaaa00, emissiveIntensity: 0.8 });
+            for (let i = 0; i < numPoints; i++) { const point = new THREE.Mesh(pointGeometry, pointMaterial); point.castShadow = true; resetPointPosition(point, true); points.push(point); scene.add(point); }
+        }
+
+         function createCarColorSelector() {
+             carColors.forEach((colorInfo, index) => {
+                 const button = document.createElement('span');
+                 button.classList.add('color-button');
+                 button.style.backgroundColor = `#${colorInfo.hex.toString(16).padStart(6, '0')}`;
+                 button.dataset.hex = colorInfo.hex; // Store hex value
+                 button.title = colorInfo.name; // Tooltip
+
+                 if (index === 0) { // Select the first one by default
+                     button.classList.add('selected');
+                 }
+
+                 button.addEventListener('click', () => {
+                     selectedColorHex = parseInt(button.dataset.hex);
+                      // Update visual selection
+                     document.querySelectorAll('.color-button').forEach(btn => btn.classList.remove('selected'));
+                     button.classList.add('selected');
+                 });
+                 colorSelectorDiv.appendChild(button);
+             });
+         }
+
+         function loadModels() {
+            const loader = new GLTFLoader(loadingManager);
+            const dracoLoader = new DRACOLoader(loadingManager);
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/'); // Standard path
+            loader.setDRACOLoader(dracoLoader);
+            const carUrl = 'https://threejs.org/examples/models/gltf/ferrari.glb'; // Using the Ferrari model
+
+            // Fallback Cube
+            const fallbackGeo = new THREE.BoxGeometry(2, 1, 4);
+            const fallbackMat = new THREE.MeshStandardMaterial({color: 0xff0000});
+            carPlaceholder = new THREE.Mesh(fallbackGeo, fallbackMat);
+            carPlaceholder.visible = false; scene.add(carPlaceholder);
+
+            loader.load(carUrl, (gltf) => {
+                // --- Success ---
+                carModel = gltf.scene;
+                carModel.scale.set(0.8, 0.8, 0.8);
+                const box = new THREE.Box3().setFromObject(carModel);
+                const size = box.getSize(new THREE.Vector3());
+                carBaseY = size.y / 2 + 0.01; // Adjust pivot to bottom
+                carModel.position.set(0, carBaseY, 0);
+                carModel.rotation.y = Math.PI; // Face forward
+                scene.add(carModel);
+
+                // Create Enemy Template AFTER player model is processed
+                enemyCarTemplate = carModel.clone();
+                 enemyBaseY = carBaseY;
+                 applyEnemyColor(enemyCarTemplate, 0x0000ff); // Ensure enemies are blue
+
+                 setupInitialCamera(); // Position camera relative to loaded car
+
+            }, undefined, (error) => {
+                 // --- Error ---
+                 console.error('Error loading car model:', error);
+                 handleModelLoadError(); // Use fallback placeholder
+                 setupInitialCamera(); // Still setup camera with placeholder
+            });
+        }
+
+        function handleModelLoadError() {
+             carModel = carPlaceholder; // Assign placeholder as the main car model
+             carModel.visible = true;
+             carBaseY = 0.5 + 0.01; // Placeholder specific Y offset
+             carModel.position.set(0, carBaseY, 0);
+             carModel.castShadow = true; carModel.receiveShadow = true;
+
+             // Create enemy template from placeholder
+             enemyBaseY = carBaseY;
+             enemyCarTemplate = carModel.clone();
+             applyEnemyColor(enemyCarTemplate, 0x0000ff); // Color the fallback blue
+
+             loadingScreen.textContent = 'Error loading car. Using fallback.';
+             console.warn("Using fallback cube for car model.");
+        }
+
+         function applyCarColor(hexColor) {
+            if (!carModel || carModel === carPlaceholder) return; // Don't try to color the placeholder
+
+            carModel.traverse((node) => {
+                if (node.isMesh) {
+                    // Attempt to apply color to standard materials
+                    if (Array.isArray(node.material)) {
+                        node.material.forEach(mat => {
+                            if (mat.isMeshStandardMaterial) mat.color.setHex(hexColor);
+                        });
+                    } else if (node.material && node.material.isMeshStandardMaterial) {
+                        node.material.color.setHex(hexColor);
+                    }
+                    node.castShadow = true; // Ensure shadows are enabled
+                    node.receiveShadow = true;
+                }
+            });
+            console.log(`Applied player car color: #${hexColor.toString(16)}`);
+         }
+
+         function applyEnemyColor(model, hexColor) {
+             if (!model) return;
+             model.traverse((node) => {
+                if (node.isMesh) {
+                     // Apply color consistently to enemies
+                     if (Array.isArray(node.material)) {
+                         node.material.forEach(mat => { if (mat.isMeshStandardMaterial) mat.color.setHex(hexColor); });
+                     } else if (node.material && node.material.isMeshStandardMaterial) {
+                         node.material.color.setHex(hexColor);
+                     }
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                 }
+             });
+         }
+
+        function setupInitialCamera() {
+            if (!carModel) return; // Need carModel or placeholder
+            camera.position.set(0, carBaseY + 3, -7);
+            camera.lookAt(carModel.position.x, carBaseY + 1, carModel.position.z + 5); // Look slightly ahead and above car base
+        }
+
+
+        // --- Game Start Logic ---
+        function startGame() {
+            if (gameStarted || !carModel || !enemyCarTemplate) { // Check if essential models are ready
+                console.warn("Cannot start game yet. Models not ready or game already started.");
+                return;
+            }
+            gameStarted = true;
+
+            startScreen.style.display = 'none'; // Hide start screen
+            uiContainer.style.display = 'block'; // Show score/level
+            leftButton.style.display = 'flex'; // Show controls
+            rightButton.style.display = 'flex';
+            tipsArea.style.display = 'block'; // Show tips area
+
+            applyCarColor(selectedColorHex); // Apply final selected color
+            spawnInitialEnemies(); // Spawn enemies now that template is ready
+
+            getAudioContext(); // Initialize audio on first interaction
+            console.log("Audio Context State:", audioCtx ? audioCtx.state : 'Not initialized');
+
+            setupControls(); // Add event listeners for controls
+            startTipsRotation(); // Begin showing tips
+            animate(); // Start the game loop
+        }
+
+
+        // --- Sound Functions ---
+        function getAudioContext() {
+            if (audioInitialized) return audioCtx; // Return existing if already initialized
+            if (!audioCtx) {
+                try {
+                    console.log("Attempting to create AudioContext...");
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    audioInitialized = true; // Mark as initialized
+                    console.log("AudioContext created successfully.");
+                    // Resume context if it starts suspended (common requirement)
+                    if (audioCtx.state === 'suspended') {
+                        audioCtx.resume().then(() => {
+                            console.log("AudioContext resumed successfully.");
+                        }).catch(e => console.error("Error resuming AudioContext:", e));
+                    }
+                } catch (e) {
+                    console.error("Web Audio API is not supported or failed to initialize:", e);
+                    audioInitialized = false; // Failed
+                    audioCtx = null;
+                }
+            }
+            return audioCtx;
+        }
+
+        function playSound(type) {
+            if (!audioInitialized || !audioCtx || audioCtx.state !== 'running') {
+                 console.warn(`Skipping ${type} sound: Audio not ready (State: ${audioCtx ? audioCtx.state : 'null'}).`);
+                 return;
+            }
+            console.log(`Playing ${type} sound...`); // DEBUG LOG
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            let freq, duration, waveType, vol;
+            switch (type) {
+                case 'point': freq = 880; duration = 0.1; waveType = 'triangle'; vol = 0.2; break;
+                case 'collision': freq = 150; duration = 0.3; waveType = 'sawtooth'; vol = 0.3; break;
+                case 'levelUp': freq = 440; duration = 0.4; waveType = 'square'; vol = 0.2; break;
+                default: console.warn("Unknown sound type:", type); return;
+            }
+
+            osc.type = waveType;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration); // Quick fade out
+
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + duration); // Stop after duration
+
+            // Optional: Add second oscillator for level up harmony
+            if (type === 'levelUp') {
+                const osc2 = audioCtx.createOscillator();
+                osc2.connect(gain); // Connect to the same gain node
+                osc2.type = waveType;
+                osc2.frequency.setValueAtTime(freq * 1.5, audioCtx.currentTime); // Perfect fifth
+                osc2.start(audioCtx.currentTime);
+                osc2.stop(audioCtx.currentTime + duration);
+            }
+        }
+        // --- End Sound Functions ---
+
+
+        // --- Enemy Spawning ---
+        function spawnEnemyCar() {
+            if (!enemyCarTemplate) { console.warn("Enemy template not ready."); return null; }
+            if (enemyCars.length >= maxTotalEnemies) { /*console.log("Max enemies reached.");*/ return null; } // Don't exceed limit
+
+            //console.log("Spawning new enemy car");
+            const newEnemy = enemyCarTemplate.clone(); // Clone the template
+            newEnemy.userData.speed = baseEnemySpeed + (Math.random() - 0.5) * 2 * enemySpeedVariance; // Individual speed
+            resetEnemyPosition(newEnemy, true); // Place it initially far ahead
+            newEnemy.visible = true;
+            scene.add(newEnemy);
+            enemyCars.push(newEnemy);
+            return newEnemy;
+        }
+
+        function spawnInitialEnemies() {
+            // Clear any previous enemies if restarting (future enhancement)
+            // enemyCars.forEach(enemy => scene.remove(enemy));
+            // enemyCars = [];
+            for(let i = 0; i < maxActiveEnemies; i++) {
+                spawnEnemyCar();
+            }
+        }
+
+        function resetEnemyPosition(enemy, initialSpawn = false) {
+             const laneWidth = roadWidth / 2 - kerbWidth - 1.0; // Keep enemies away from kerbs
+             enemy.position.x = (Math.random() * 2 - 1) * laneWidth * 0.8; // Place more centrally
+             enemy.position.y = enemyBaseY;
+             // Place further ahead, especially on initial spawn
+             enemy.position.z = roadLength / 2 + Math.random() * roadLength * (initialSpawn ? 1.5 : 0.8);
+             enemy.rotation.y = Math.PI; // Face forward
+        }
+
+
+        // --- Controls Setup ---
+        function setupControls() {
+            // Ensure listeners aren't added multiple times if game restarts
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            leftButton.removeEventListener('touchstart', handleTouchStart);
+            leftButton.removeEventListener('touchend', handleTouchEnd);
+            leftButton.removeEventListener('touchcancel', handleTouchEnd);
+            rightButton.removeEventListener('touchstart', handleTouchStart);
+            rightButton.removeEventListener('touchend', handleTouchEnd);
+            rightButton.removeEventListener('touchcancel', handleTouchEnd);
+
+            // Add listeners
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            leftButton.addEventListener('touchstart', handleTouchStart, { passive: false });
+            leftButton.addEventListener('touchend', handleTouchEnd);
+            leftButton.addEventListener('touchcancel', handleTouchEnd); // Handle cancellation
+            rightButton.addEventListener('touchstart', handleTouchStart, { passive: false });
+            rightButton.addEventListener('touchend', handleTouchEnd);
+            rightButton.addEventListener('touchcancel', handleTouchEnd); // Handle cancellation
+        }
+
+        function handleKeyDown(event) { if (!isGameOver && gameStarted) { if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') { moveLeft = true; } else if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') { moveRight = true; } } }
+        function handleKeyUp(event) { if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') { moveLeft = false; } else if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') { moveRight = false; } }
+        function handleTouchStart(e) { if (!isGameOver && gameStarted) { e.preventDefault(); if (e.currentTarget.id === 'left-button') { moveLeft = true; } else if (e.currentTarget.id === 'right-button') { moveRight = true; } } }
+        function handleTouchEnd(e) { e.preventDefault(); if (e.currentTarget.id === 'left-button') { moveLeft = false; } else if (e.currentTarget.id === 'right-button') { moveRight = false; } }
+        // --- End Controls ---
+
+        // --- Point Reset ---
+        function resetPointPosition(point, initial = false) {
+            const laneWidth = roadWidth / 2 - kerbWidth - pointRadius * 2; // Area points can spawn in
+            point.position.x = (Math.random() * 2 - 1) * laneWidth; // Random X within lanes
+            point.position.y = pointRadius + 0.01; // Slightly above ground
+            // Place ahead of the player, further for initial spawn
+            if (initial) { point.position.z = Math.random() * roadLength - roadLength / 2; }
+            else { point.position.z = roadLength / 2 + Math.random() * roadLength * 0.5; }
+            point.visible = true; // Make sure it's visible
+        }
+
+        // --- UI Updates ---
+        function updateScoreDisplay() { scoreElement.textContent = `Score: ${score}`; }
+        function updateLevelDisplay() { levelElement.textContent = `Level: ${currentLevel}`; }
+
+        function showVihanMessage(message, duration = vihanMessageDuration) {
+            if (vihanMessageTimeoutId) clearTimeout(vihanMessageTimeoutId); // Clear previous timeout
+
+            vihanMessageArea.textContent = message;
+            vihanMessageArea.style.display = 'block';
+            // Use requestAnimationFrame to ensure 'display: block' applies before starting transition
+            requestAnimationFrame(() => {
+                 requestAnimationFrame(() => { // Nested rAF for safety in some browsers
+                     vihanMessageArea.style.opacity = '1';
+                 });
+            });
+
+            vihanMessageTimeoutId = setTimeout(() => {
+                vihanMessageArea.style.opacity = '0';
+                 // Wait for fade out before hiding completely to avoid abrupt disappearance
+                 setTimeout(() => {
+                     if (vihanMessageArea.style.opacity === '0') { // Check if still fading out
+                        vihanMessageArea.style.display = 'none';
+                     }
+                 }, 500); // Match CSS transition duration
+            }, duration);
+        }
+
+        function startTipsRotation() {
+            if (tipsIntervalId) clearInterval(tipsIntervalId); // Clear existing interval if any
+            currentTipIndex = Math.floor(Math.random() * tips.length); // Start with a random tip
+            tipsArea.textContent = tips[currentTipIndex];
+            tipsArea.style.opacity = '1'; // Fade in the tips area
+
+            tipsIntervalId = setInterval(() => {
+                currentTipIndex = (currentTipIndex + 1) % tips.length;
+                tipsArea.style.opacity = '0'; // Fade out old tip
+                 setTimeout(() => {
+                    tipsArea.textContent = tips[currentTipIndex];
+                    tipsArea.style.opacity = '1'; // Fade in new tip
+                 }, 300); // Short delay for fade effect
+            }, tipsIntervalDuration);
+        }
+        function stopTipsRotation() {
+            if (tipsIntervalId) clearInterval(tipsIntervalId);
+            tipsIntervalId = null;
+             tipsArea.style.opacity = '0';
+             // Don't immediately hide, let fade finish in CSS
+        }
+
+
+        // --- Window Resize ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Level Up Logic ---
+        function checkLevelUp() {
+            if (score >= currentLevelScoreThreshold) {
+                currentLevel++;
+                // Increase threshold more significantly for later levels
+                currentLevelScoreThreshold += scoreThresholdIncrement * (1 + (currentLevel-1)*0.5);
+                driveSpeed += speedIncrement; // Increase game speed
+                maxActiveEnemies = Math.min(maxTotalEnemies, 1 + (currentLevel - 1) * enemiesPerLevel); // Increase active enemies, capped
+
+                console.log(`Level Up! Lvl: ${currentLevel}, Spd: ${driveSpeed.toFixed(2)}, Enemies: ${maxActiveEnemies}, Next Score: ${Math.round(currentLevelScoreThreshold)}`);
+                updateLevelDisplay();
+                playSound('levelUp');
+                showVihanMessage(positiveMessages[Math.floor(Math.random() * positiveMessages.length)]); // Show positive message
+
+                 // Spawn new enemies if the cap increased
+                 const enemiesToSpawn = maxActiveEnemies - enemyCars.length;
+                 for (let i = 0; i < enemiesToSpawn; i++) {
+                     spawnEnemyCar();
+                 }
+            }
+        }
+
+        // --- Game Over ---
+        function triggerGameOver() {
+            if (isGameOver) return; // Prevent multiple triggers
+             isGameOver = true; // Set game over flag
+             playSound('collision');
+             stopTipsRotation(); // Stop showing tips
+
+             // Select and display random crash message
+             const randomCrashMsg = crashMessages[Math.floor(Math.random() * crashMessages.length)];
+             gameOverMessageElement.textContent = randomCrashMsg;
+             gameOverContainer.style.display = 'block'; // Show "GAME OVER!" container
+
+             // Stop animation loop
+             if (animationFrameId) {
+                 cancelAnimationFrame(animationFrameId);
+                 animationFrameId = null;
+             }
+
+             console.log("Game Over Triggered!");
+             // Could add a restart button functionality here later
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+             if (isGameOver) return; // Stop loop if game is over
+
+             animationFrameId = requestAnimationFrame(animate); // Request next frame
+
+             const deltaZ = driveSpeed; // Use the potentially increased speed
+
+            // --- Scenery Movement ---
+            roadLines.forEach(line => { line.position.z -= deltaZ; if (line.position.z < -roadLength / 2) { line.position.z += roadLength; } });
+            buildings.forEach(building => { building.position.z -= deltaZ; if (building.position.z < -roadLength / 2 - building.geometry.parameters.depth / 2) { building.position.z += roadLength + Math.random() * buildingSpacing * 2; const sideSign = Math.sign(building.position.x); const xOffset = roadWidth / 2 + kerbWidth + 1 + Math.random() * 5 + building.geometry.parameters.width / 2; building.position.x = sideSign * xOffset; } });
+            streetLights.forEach(light => { light.position.z -= deltaZ; if (light.position.z < -roadLength / 2) { light.position.z += roadLength + Math.random() * lightSpacing * 2; } });
+            trafficLights.forEach(light => { light.position.z -= deltaZ; if (light.position.z < -roadLength / 2) { light.position.z += roadLength * 1.5 + Math.random() * roadLength; } });
+            // Kerbs are static relative to road, no need to move Z
+
+            // --- Move and Recycle Points ---
+            points.forEach(point => { if (!point.visible) return; point.position.z -= deltaZ; if (point.position.z < -roadLength / 2) { resetPointPosition(point); } });
+
+            // --- Move Enemy Cars ---
+             enemyCars.forEach(enemy => {
+                 if (!enemy || !enemy.visible) return; // Check if enemy exists and is visible
+                 enemy.position.z -= enemy.userData.speed; // Use individual speed
+                 if (enemy.position.z < -roadLength / 2 - 20) { // Check further back before reset
+                     resetEnemyPosition(enemy);
+                 }
+             });
+
+            // --- Handle Player Car Controls & Update Bounding Box ---
+             if (carModel && carBaseY > 0) { // Ensure carModel is ready
+                 let maxBounds = roadWidth / 2 - kerbWidth - 0.1; // Default bounds
+                 try {
+                    playerBox.setFromObject(carModel); // Update player box first
+                    const carWidth = playerBox.max.x - playerBox.min.x;
+                    const carHalfWidth = carWidth / 2;
+                    maxBounds = roadWidth / 2 - kerbWidth - carHalfWidth - 0.1; // Calculate bounds based on car width
+                 } catch(e) { console.warn("Error getting car bounding box size.", e); } // Log error if box calc fails
+
+                 // Apply movement based on input and bounds
+                 if (moveLeft && carModel.position.x > -maxBounds) { carModel.position.x -= carMoveSpeed; }
+                 if (moveRight && carModel.position.x < maxBounds) { carModel.position.x += carMoveSpeed; }
+                 // Clamp position to ensure it stays within bounds
+                 carModel.position.x = Math.max(-maxBounds, Math.min(maxBounds, carModel.position.x));
+
+                 playerBox.setFromObject(carModel); // Update box AFTER moving
+
+                 // Update Camera (Smooth follow)
+                 const targetCameraX = carModel.position.x * 0.5; // Camera follows less drastically
+                 camera.position.x += (targetCameraX - camera.position.x) * 0.1; // Lerp for smoothness
+                 camera.lookAt(carModel.position.x, carBaseY + 1, carModel.position.z + 5); // Look ahead
+             }
+
+             // --- Collision Detection ---
+             if (carModel) {
+                 // Point Collision
+                 points.forEach(point => {
+                    if (!point.visible) return; // Skip invisible points
+                    pointBox.setFromObject(point); // Update point's bounding box
+                    if (playerBox.intersectsBox(pointBox)) { // Check intersection
+                        score += pointValue;
+                        updateScoreDisplay();
+                        playSound('point'); // Play sound effect
+                        point.visible = false; // Hide point
+                        resetPointPosition(point); // Immediately reset for continuous flow
+                        checkLevelUp(); // Check if score triggers level up
+                    }
+                 });
+
+                 // Enemy Collision
+                 for (const enemy of enemyCars) {
+                    if (!enemy || !enemy.visible) continue; // Skip inactive enemies
+                    enemyBox.setFromObject(enemy); // Update enemy's bounding box
+                    if (playerBox.intersectsBox(enemyBox)) { // Check intersection
+                        triggerGameOver(); // End the game
+                        break; // Stop checking collisions once game over is triggered
+                    }
+                 }
+             }
+
+            // --- Render ---
+            renderer.render(scene, camera);
+        } // End animate()
+
+    </script>
+</body>
+</html>
